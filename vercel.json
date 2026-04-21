@@ -1,5 +1,7 @@
 {
-  "routes": [
-    { "src": "/playlist", "dest": "/api/playlist.js" }
-  ]
+  "functions": {
+    "api/*.js": {
+      "maxDuration": 60
+    }
+  }
 }
