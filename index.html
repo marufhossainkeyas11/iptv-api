@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>IPTV Player</title>
+</head>
+<body>
+
+<h2>📺 Channel List</h2>
+<div id="channels"></div>
+
+<h2>▶ Player</h2>
+<video id="player" controls autoplay width="600"></video>
+
+<script>
+const API_BASE = "https://iptv-api-zeta.vercel.app"; // 🔥 change this
+const JSON_URL = "https://raw.githubusercontent.com/marufhossainkeyas11/iptv-api/main/data/channels.json"; // 🔥 change this
+
+// 📥 load channels
+async function loadChannels() {
+  const res = await fetch(JSON_URL);
+  const data = await res.json();
+
+  const container = document.getElementById("channels");
+
+  data.forEach(ch => {
+    const btn = document.createElement("button");
+    btn.innerText = ch.name;
+    btn.onclick = () => playChannel(ch.id);
+
+    container.appendChild(btn);
+    container.appendChild(document.createElement("br"));
+  });
+}
+
+// ▶ play channel
+async function playChannel(id) {
+  try {
+    const res = await fetch(`${API_BASE}/api/getStream?id=${id}`);
+    const data = await res.json();
+
+    if (data.stream) {
+      const player = document.getElementById("player");
+
+      // 🔥 HLS support
+      if (player.canPlayType('application/vnd.apple.mpegurl')) {
+        player.src = data.stream;
+      } else {
+        // fallback (HLS.js)
+        loadHLS(data.stream);
+      }
+    }
+  } catch (err) {
+    alert("Stream load failed");
+  }
+}
+
+// 🎥 HLS fallback
+function loadHLS(url) {
+  const script = document.createElement("script");
+  script.src = "https://cdn.jsdelivr.net/npm/hls.js@latest";
+
+  script.onload = () => {
+    const video = document.getElementById("player");
+    const hls = new Hls();
+    hls.loadSource(url);
+    hls.attachMedia(video);
+  };
+
+  document.body.appendChild(script);
+}
+
+// 🚀 init
+loadChannels();
+</script>
+
+</body>
+</html>
