@@ -1,60 +1,34 @@
-import chromium from '@sparticuz/chromium';
-import puppeteer from 'puppeteer-core';
+// /api/channels.js
+import fs from 'fs/promises';
+import path from 'path';
 
-let cache = {};
+async function resolveStream(id) {
+  // এটা তোমার own backend/API হওয়া উচিত
+  const r = await fetch(`${process.env.RESOLVER_URL}?id=${id}`);
+  if (!r.ok) return null;
+
+  const data = await r.json();
+  return data.stream || null;
+}
 
 export default async function handler(req, res) {
-    const { id } = req.query;
+  try {
+    const filePath = path.join(process.cwd(), 'data', 'channels.json');
+    const raw = await fs.readFile(filePath, 'utf8');
+    const channels = JSON.parse(raw);
 
-    if (!id) {
-        return res.status(400).json({ error: "Missing id" });
-    }
-
-    // ⏱️ cache (30s)
-    if (cache[id] && Date.now() - cache[id].time < 30000) {
-        return res.json(cache[id].data);
-    }
-
-    const targetUrl = `https://tv.cloudfront.fun/redint/${id}`;
-
-    let browser;
-
-    try {
-        browser = await puppeteer.launch({
-            args: chromium.args,
-            executablePath: await chromium.executablePath(),
-            headless: true,
-        });
-
-        const page = await browser.newPage();
-        let streamUrl = "";
-
-        page.on('response', async (response) => {
-            const url = response.url();
-            if (url.includes('.m3u8')) {
-                streamUrl = url;
-            }
-        });
-
-        await page.goto(targetUrl, { waitUntil: 'networkidle2' });
-
-        await browser.close();
-
-        if (!streamUrl) {
-            return res.status(404).json({ error: "Stream not found" });
-        }
-
-        const result = { id, stream: streamUrl };
-
-        cache[id] = {
-            time: Date.now(),
-            data: result
+    const updated = await Promise.all(
+      channels.map(async (ch) => {
+        const freshStream = await resolveStream(ch.id);
+        return {
+          ...ch,
+          stream: freshStream || ch.stream || ""
         };
+      })
+    );
 
-        return res.json(result);
-
-    } catch (err) {
-        if (browser) await browser.close();
-        return res.status(500).json({ error: err.message });
-    }
+    return res.status(200).json(updated);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
 }
