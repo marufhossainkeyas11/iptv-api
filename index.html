@@ -1,78 +1,751 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="bn">
 <head>
-  <meta charset="UTF-8">
-  <title>IPTV Player</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPTVIDN M3U Generator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Tiro+Bangla&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #080b10;
+    --surface: #0e1420;
+    --card: #111827;
+    --border: #1e2d40;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --green: #00e676;
+    --text: #e2eaf4;
+    --muted: #4a6080;
+    --error: #ff4444;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Tiro Bangla', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 32px 16px 60px;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  .header-badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    border: 1px solid rgba(0,212,255,0.3);
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+  }
+  h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(1.6rem, 5vw, 2.4rem);
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 10px;
+  }
+  h1 span { color: var(--accent); }
+  .subtitle {
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Warning banner */
+  .bdix-warn {
+    background: rgba(255,107,53,0.08);
+    border: 1px solid rgba(255,107,53,0.25);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 24px;
+    font-size: 0.85rem;
+    color: #ffaa80;
+    font-family: 'JetBrains Mono', monospace;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .bdix-warn .icon { flex-shrink: 0; font-size: 1rem; }
+
+  /* Category pills */
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .cats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 28px;
+  }
+  .cat-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.03em;
+  }
+  .cat-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .cat-btn.active {
+    background: rgba(0,212,255,0.12);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Stats row */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    margin-bottom: 24px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .stat {
+    background: var(--card);
+    padding: 14px 10px;
+    text-align: center;
+  }
+  .stat-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .stat-label {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* Progress */
+  .progress-wrap {
+    margin-bottom: 20px;
+    display: none;
+  }
+  .progress-wrap.visible { display: block; }
+  .progress-bar-bg {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), #0077ff);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.2s ease;
+  }
+  .progress-text {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* Log box */
+  .log {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    min-height: 40px;
+    max-height: 80px;
+    overflow-y: auto;
+    display: none;
+    line-height: 1.6;
+  }
+  .log.visible { display: block; }
+  .log .ok  { color: var(--green); }
+  .log .err { color: var(--error); }
+  .log .inf { color: var(--accent); }
+
+  /* Buttons */
+  .btn-row { display: flex; gap: 10px; }
+  .btn {
+    flex: 1;
+    padding: 14px 20px;
+    border-radius: 8px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'JetBrains Mono', monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    letter-spacing: 0.02em;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #33ddff;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(0,212,255,0.3);
+  }
+  .btn-primary:disabled {
+    background: var(--border);
+    color: var(--muted);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+  .btn-secondary {
+    flex: 0 0 auto;
+    padding: 14px 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-secondary:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* Done */
+  .done-banner {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: rgba(0,230,118,0.08);
+    border: 1px solid rgba(0,230,118,0.25);
+    border-radius: 8px;
+    color: var(--green);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    display: none;
+  }
+  .done-banner.visible { display: block; }
+
+  /* Channel list preview */
+  .channel-list {
+    margin-top: 32px;
+    display: none;
+  }
+  .channel-list.visible { display: block; }
+  .channel-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .channels-grid {
+    display: grid;
+    gap: 8px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .ch-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    animation: fadeIn 0.3s ease both;
+  }
+  .ch-item.ok { border-left: 2px solid var(--green); }
+  .ch-item.fail { border-left: 2px solid var(--error); opacity: 0.5; }
+  .ch-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: var(--border);
+    flex-shrink: 0;
+  }
+  .ch-info { flex: 1; min-width: 0; }
+  .ch-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ch-cat {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .ch-status { font-size: 13px; flex-shrink: 0; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Spinner */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(0,0,0,0.2);
+    border-top-color: #000;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+    flex-shrink: 0;
+  }
+  .running .spinner { display: block; }
+  .running .btn-icon { display: none; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
 </head>
 <body>
+<div class="container">
 
-<h2>📺 Channel List</h2>
-<div id="channels"></div>
+  <div class="header">
+    <div class="header-badge">📡 BDIX Live TV</div>
+    <h1>IPTVIDN <span>M3U</span></h1>
+    <p class="subtitle">Fresh token • Direct browser fetch • 147 channels</p>
+  </div>
 
-<h2>▶ Player</h2>
-<video id="player" controls autoplay width="600"></video>
+  <div class="bdix-warn">
+    <span class="icon">⚠️</span>
+    <span>এই পেজটি শুধুমাত্র <strong>BDIX connection</strong> থেকে কাজ করবে। তোমার browser সরাসরি iptvidn.com থেকে token নেবে।</span>
+  </div>
+
+  <div class="section-label">Category Filter</div>
+  <div class="cats" id="cats">
+    <button class="cat-btn active" data-cat="ALL">সব (147)</button>
+    <button class="cat-btn" data-cat="Live Sports">Live (7)</button>
+    <button class="cat-btn" data-cat="Sports">Sports (44)</button>
+    <button class="cat-btn" data-cat="News">News (11)</button>
+    <button class="cat-btn" data-cat="Bangla">Bangla (27)</button>
+    <button class="cat-btn" data-cat="Movies">Movies (22)</button>
+    <button class="cat-btn" data-cat="Hindi">Hindi (11)</button>
+    <button class="cat-btn" data-cat="Kids">Kids (5)</button>
+    <button class="cat-btn" data-cat="Documentary">Docs (14)</button>
+    <button class="cat-btn" data-cat="Music">Music (6)</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-num">147</div>
+      <div class="stat-label">Total</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="statSelected">147</div>
+      <div class="stat-label">Selected</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="statFetched">—</div>
+      <div class="stat-label">Fetched</div>
+    </div>
+  </div>
+
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-text">
+      <span id="progressLabel">Token fetch হচ্ছে...</span>
+      <span id="progressCount">0 / 0</span>
+    </div>
+  </div>
+
+  <div class="log" id="log"></div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" id="btnDownload">
+      <div class="spinner"></div>
+      <span class="btn-icon">⬇</span>
+      <span id="btnText">M3U Download</span>
+    </button>
+    <button class="btn btn-secondary" id="btnTest" title="Quick test">⚡</button>
+  </div>
+
+  <div class="done-banner" id="doneBanner">✓ M3U ফাইল download হয়েছে!</div>
+
+  <div class="channel-list" id="channelList">
+    <div class="channel-list-header">
+      <div class="section-label" style="margin:0">Channel Status</div>
+      <span style="font-family:JetBrains Mono,monospace;font-size:11px;color:var(--muted)" id="listCount"></span>
+    </div>
+    <div class="channels-grid" id="channelsGrid"></div>
+  </div>
+
+</div>
 
 <script>
-const API_BASE = "https://bdiptv-api-fw9s.vercel.app/"; // 🔥 change this
-const JSON_URL = "https://raw.githubusercontent.com/marufhossainkeyas11/iptv-api/main/data/channels.json"; // 🔥 change this
+const MAIN_URL    = "http://iptvidn.com";
+const LIVE_SERVER = "http://103.89.248.30:8082/";
+const TOKEN_RE    = /embed\.html\?token=([^&"'\s]+)/;
 
-// 📥 load channels
-async function loadChannels() {
-  const res = await fetch(JSON_URL);
-  const data = await res.json();
+const CHANNELS = [
+  ["1LIVE","Live 1","Live1.jpeg","Live Sports"],
+  ["2LIVE","Live 2","Live2.jpeg","Live Sports"],
+  ["LIVE-CRICKET","Live Cricket","LIVE-CRICKET.jpg","Live Sports"],
+  ["LIVE-CRICKET-1","Live Cricket 1","LIVE-CRICKET.jpg","Live Sports"],
+  ["LIVE-FOOTBALL","Live Football","LIVE-FOOTBALL.jpg","Live Sports"],
+  ["LIVE-FOOTBALL-1","Live Football 1","LIVE-FOOTBALL.jpg","Live Sports"],
+  ["LIVE-FOOTBALL-2","Live Football 2","LIVE-FOOTBALL.jpg","Live Sports"],
+  ["STAR-SPORTS-1","Star Sports 1","starsports1.jpg","Sports"],
+  ["STAR-SPORTS-2","Star Sports 2","starsports2.jpg","Sports"],
+  ["T-SPORTS","T Sports","tsports.jpg","Sports"],
+  ["GAZI-TV","Gazi TV","gazi.jpg","Sports"],
+  ["PTV","PTV Sports","ptvsports.jpg","Sports"],
+  ["Afgan-Sports","Afghan Sports","AFGAN.jpg","Sports"],
+  ["SUPERSPORTS-CRICKET","SuperSport Cricket","Supersportscricket.jpeg","Sports"],
+  ["SUPERSPORTS-FOOTBALL","SuperSport Football","Supersportsfootball.jpeg","Sports"],
+  ["SUPERSPORTS-LALIGA","SuperSport La Liga","laliga.jpg","Sports"],
+  ["SUPERSPORTS-PREMIER-LEAGUE","SuperSport Premier League","premer league.jpg","Sports"],
+  ["Sportv","Sport TV","sportv.jpeg","Sports"],
+  ["SSC1","SSC","SSC.jpg","Sports"],
+  ["GEO-SPORTS","Geo Super","geosuper.jpg","Sports"],
+  ["MUTV","MUTV","mutv.jpg","Sports"],
+  ["Bein-hd","beIN Sports HD","bein1.jpg","Sports"],
+  ["BEIN-SPORTS-2","beIN Sports 2","bein2.jpg","Sports"],
+  ["BEIN-SPORTS-3","beIN Sports 3","bein3.jpg","Sports"],
+  ["Bein-Sports-4","beIN Sports 4","bein4.jpg","Sports"],
+  ["Ten-Cricket-HD","Ten Cricket HD","tencricket.jpg","Sports"],
+  ["TNT-Sports-1","TNT Sports 1","tntsports1.jpeg","Sports"],
+  ["TNT-Sports-2","TNT Sports 2","tntsports2.jpeg","Sports"],
+  ["TNT-Sports-3","TNT Sports 3","tntsports3.jpeg","Sports"],
+  ["Uk-TNT-4","TNT Sports 4","tnt sports4.jpg","Sports"],
+  ["FOX-SPORTS","Fox Sports","fox.jpg","Sports"],
+  ["FOX-SPORTS1","Fox Sports 1","foxsports1.jpg","Sports"],
+  ["willow","Willow HD","willowhd.jpg","Sports"],
+  ["Sky-Sports-Main-Event","Sky Sports Main Event","skymainevent.jpg","Sports"],
+  ["Sky-Sports-Cricket","Sky Sports Cricket","skycricket.jpg","Sports"],
+  ["SKY-Sports-Football","Sky Sports Football","skyfootball.jpg","Sports"],
+  ["Sky-Sports-premier-League","Sky Sports Premier League","skypremierleague.jpg","Sports"],
+  ["Star-sports-select-1","Star Sports Select 1","starselect1.jpg","Sports"],
+  ["Star-sports-select-2","Star Sports Select 2","starselect2.jpg","Sports"],
+  ["Sony-TEN-1","Sony TEN 1","sonyten-1.png","Sports"],
+  ["sony-TEN-2","Sony TEN 2","sonyten2.png","Sports"],
+  ["sony-ten3","Sony TEN 3 HD","ten3hd.jpg","Sports"],
+  ["Sony-TEN-5","Sony TEN 5","sonyten5.png","Sports"],
+  ["SPORTS-18","Sports 18","Sports18-S1.jpg","Sports"],
+  ["Eurosports","Eurosport","eurosports1.jpg","Sports"],
+  ["Star-sport-3","Star Sports 3","starsports3.jpg","Sports"],
+  ["A-SPORTS","A Sports","a-sports.jpg","Sports"],
+  ["DUBAI-SPORTS-2","Dubai Sports 2","dubai sports.jpg","Sports"],
+  ["dubai-sports-3","Dubai Sports 3","dubai sports.jpg","Sports"],
+  ["AND-XPLORE","AND Xplore","band sports.jpg","Sports"],
+  ["ESPN-1","ESPN HD","espnhd.jpg","Sports"],
+  ["BBC-NEWS","BBC News","bbcnews.jpg","News"],
+  ["BBC-Earth","BBC Earth HD","bbcearthhd.jpg","News"],
+  ["CNN","CNN","cnnnews.jpg","News"],
+  ["Jamuna","Jamuna TV","jamunatv.jpg","News"],
+  ["Chanal24","Channel 24","channel24.jpg","News"],
+  ["ATN-NEWS","ATN News","atnnews.jpg","News"],
+  ["NEWS-24","News 24","news24.jpg","News"],
+  ["SOMOY_TV","Somoy TV","somoy.jpg","News"],
+  ["DBC-NEWS","DBC News","dbc.jpg","News"],
+  ["INDEPENDENT-NEWS","Independent TV","independenttv.jpg","News"],
+  ["71-TV","71 TV","ekattortv.jpg","News"],
+  ["JALSHA-MOVIES","Jalsha Movies","jalshamovies.jpg","Bangla"],
+  ["Star_jalsha","Star Jalsha","starjalsha.jpg","Bangla"],
+  ["zee-bangla","Zee Bangla HD","zeebanglahd.jpg","Bangla"],
+  ["GAZI-TV","Gazi TV","gazi.jpg","Bangla"],
+  ["RONGEEN-TV","Rongeen TV","rongeen.jpg","Bangla"],
+  ["GLOBAL-TV","Global TV","globaltv.jpg","Bangla"],
+  ["DESH","Desh TV","deshtv.jpg","Bangla"],
+  ["ATN-BANGLA","ATN Bangla","atnbangla.jpg","Bangla"],
+  ["CHANNAL-I","Channel i","channeli.jpg","Bangla"],
+  ["NTV","NTV","ntv.jpg","Bangla"],
+  ["RTV","RTV","rtv.jpg","Bangla"],
+  ["NEXUS-TV","Nexus TV","nexustv.jpg","Bangla"],
+  ["Akash-aat","Akash Aat","akashaath.jpg","Bangla"],
+  ["ENTER-10-BANGLA","Enter 10 Bangla","enterr10.jpg","Bangla"],
+  ["BIJOY-TV","Bijoy TV","bijoytv.jpg","Bangla"],
+  ["MOHONA-TV","Mohona TV","mohonatv.jpg","Bangla"],
+  ["DURONTO-TV","Duronto TV","duronto.jpg","Bangla"],
+  ["ANANDA-TV","Ananda TV","anandotv.jpg","Bangla"],
+  ["MY-TV","My TV","mytv.jpg","Bangla"],
+  ["NAGORIK-TV","Nagorik TV","nagorik.jpg","Bangla"],
+  ["MAASRANGA-TV","Maasranga TV","maasranga.jpg","Bangla"],
+  ["CHANNEL-9","Channel 9","channel9.jpg","Bangla"],
+  ["EKHON-TV","Ekhon TV","ekhon.jpg","Bangla"],
+  ["EKUSHEY-TV","Ekushey TV","ekushey.jpg","Bangla"],
+  ["madani-channel-bangla","Madani Channel Bangla","madanichannel.jpg","Bangla"],
+  ["RUPOSHI-BANGLA","Ruposhi Bangla","Rupasi bangla.jpeg","Bangla"],
+  ["Sony-Aath","Sony Aath","sonyaath.jpg","Bangla"],
+  ["ZEE-24-GHANTA","Zee 24 Ghanta","zee 24.jpeg","Bangla"],
+  ["AND-TV","AND TV","and tv.jpeg","Movies"],
+  ["Colors-Bangla","Colors Bangla","colorsbangla.jpg","Movies"],
+  ["COLORS-BANGLA-CINEMA","Colors Bangla Cinema","colar-bangla-cinema.jpg","Movies"],
+  ["ZEE-BANGLA-CINEMA","Zee Bangla Cinema","zeebanglacinema.jpg","Movies"],
+  ["Zee-Cinema-HD","Zee Cinema HD","zee cinema.jpeg","Movies"],
+  ["zee-tv-hd","Zee TV HD","zee tv.jpeg","Movies"],
+  ["ZEE-ANMOL-CHANEMA","Zee Anmol Cinema","zeeanmol.jpg","Movies"],
+  ["HBO","HBO HD","hbohd.jpg","Movies"],
+  ["B4U-MOVIES","B4U Movies","b4umovies.jpg","Movies"],
+  ["my-time","My Time","my time.jpg","Movies"],
+  ["AXN","AXN","axn.jpg","Movies"],
+  ["STAR-PLUS","Star Plus HD","starplushd.jpg","Hindi"],
+  ["STAR-MOVIES-SELECT","Star Movies Select HD","starmovieshd.jpg","Movies"],
+  ["star-gold","Star Gold","stargold.jpg","Movies"],
+  ["star-gold-2","Star Gold 2","stargold2.jpg","Movies"],
+  ["STAR-GOLD-THRILLS","Star Gold Thrills","stargoldthrills.jpg","Movies"],
+  ["STAR-GOLD-ROMANCE","Star Gold Romance","stargoldromance.jpg","Movies"],
+  ["STAR-BHARAT","Star Bharat","starbharat.jpg","Hindi"],
+  ["SONY-TV","Sony TV","sonytv.jpg","Hindi"],
+  ["HUM-TV","HUM TV HD","humtvhd.jpg","Hindi"],
+  ["Hum-masala","HUM Masala","hum masala.jpg","Hindi"],
+  ["Hum-Sitarey","HUM Sitarey","hum sitarey.jpg","Hindi"],
+  ["SONY-MAX","Sony MAX HD","sonymaxhd.jpg","Movies"],
+  ["sony-max2","Sony MAX 2","sony max2.jpeg","Movies"],
+  ["SONY-SAB","Sony SAB HD","sonysabhd.jpg","Hindi"],
+  ["sony-WAH","Sony WAH","sony wah.jpeg","Hindi"],
+  ["Colors-HD","Colors HD","colorshd.jpg","Hindi"],
+  ["SONY-YAY","Sony YAY!","sonyyay.jpg","Kids"],
+  ["SONY-KAL","Sony KAL","sony kal.jpeg","Hindi"],
+  ["sony-pix-hd","Sony PIX HD","sonypix.jpg","Movies"],
+  ["mtv-beats","MTV Beats","mtvbeats.jpg","Movies"],
+  ["AND-FLIX","AND FLIX HD","andflixhd.jpg","Movies"],
+  ["and-picture-HD","AND Pictures HD","andpictureshd.jpg","Movies"],
+  ["animalplanent","Animal Planet","animalplanetnew.jpg","Documentary"],
+  ["National-geo-graphy-bangla","National Geographic Bangla","nationalgeo.jpg","Documentary"],
+  ["nat-geo-wild","Nat Geo Wild HD","natgeowildhd.jpg","Documentary"],
+  ["DISCOVERY-HD","Discovery HD","discoveryhd.jpg","Documentary"],
+  ["travel-xp","Travel XP HD","travelxphd.jpg","Documentary"],
+  ["tlc-hd","TLC HD","tlchd.jpg","Documentary"],
+  ["REDBOL-TV","Red Bull TV","red bull.jpg","Documentary"],
+  ["DMAX","DMAX","dmax.jpg","Documentary"],
+  ["LOVE-NATURE","Love Nature","love nature.jpg","Documentary"],
+  ["Wild-Earth","Wild Earth","wild earth.jpg","Documentary"],
+  ["Discovery-Science","Discovery Science","discoveryscience.jpg","Documentary"],
+  ["Discovery-Turbo","Discovery Turbo","discovery turbo.jpg","Documentary"],
+  ["Investigation-Discovery","Investigation Discovery","investigation discovery.jpg","Documentary"],
+  ["DISCOVERY-BANGLA","Discovery Bangla","discoverybangla.jpg","Documentary"],
+  ["DISNEY-HINDI","Disney Channel Hindi","disneychannel.jpg","Kids"],
+  ["DISCOVERY-KIDS","Discovery Kids","discoverykids.jpg","Kids"],
+  ["cn","Cartoon Network","cartoonnetwork.jpg","Kids"],
+  ["POGO","POGO","pogo.jpg","Kids"],
+  ["MN-Plus","MN+ HD","mnplushd.jpg","Movies"],
+  ["GAANBANGLA-TV","Gaan Bangla","gaanbangla.jpg","Music"],
+  ["SANGEET-BANGLA","Sangeet Bangla","Sangeetbangla.jpg","Music"],
+  ["9XM","9XM","9xm.jpg","Music"],
+  ["9X-JALWA","9X Jalwa","9xjalwa.jpg","Music"],
+  ["B4U-MUSIC","B4U Music","b4umusic.jpg","Music"],
+  ["xite-music","Xite Music","Xitemusic.jpeg","Music"],
+];
 
-  const container = document.getElementById("channels");
+const CAT_COUNTS = { "ALL":147,"Live Sports":7,"Sports":44,"News":11,"Bangla":27,"Movies":22,"Hindi":11,"Kids":5,"Documentary":14,"Music":6 };
 
-  data.forEach(ch => {
-    const btn = document.createElement("button");
-    btn.innerText = ch.name;
-    btn.onclick = () => playChannel(ch.id);
+let selectedCat = "ALL";
+let isRunning = false;
 
-    container.appendChild(btn);
-    container.appendChild(document.createElement("br"));
+// Elements
+const btnDownload  = document.getElementById("btnDownload");
+const btnTest      = document.getElementById("btnTest");
+const btnText      = document.getElementById("btnText");
+const progressWrap = document.getElementById("progressWrap");
+const progressFill = document.getElementById("progressFill");
+const progressLabel= document.getElementById("progressLabel");
+const progressCount= document.getElementById("progressCount");
+const logEl        = document.getElementById("log");
+const doneBanner   = document.getElementById("doneBanner");
+const statSelected = document.getElementById("statSelected");
+const statFetched  = document.getElementById("statFetched");
+const channelList  = document.getElementById("channelList");
+const channelsGrid = document.getElementById("channelsGrid");
+const listCount    = document.getElementById("listCount");
+
+// Category buttons
+document.querySelectorAll(".cat-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (isRunning) return;
+    document.querySelectorAll(".cat-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    selectedCat = btn.dataset.cat;
+    statSelected.textContent = CAT_COUNTS[selectedCat] || 0;
+    resetUI();
   });
-}
+});
 
-// ▶ play channel
-async function playChannel(id) {
+// Fetch token from page — same as extension content.js
+async function fetchToken(streamId) {
   try {
-    const res = await fetch(`${API_BASE}/api/getStream?id=${id}`);
-    const data = await res.json();
-
-    if (data.stream) {
-      const player = document.getElementById("player");
-
-      // 🔥 HLS support
-      if (player.canPlayType('application/vnd.apple.mpegurl')) {
-        player.src = data.stream;
-      } else {
-        // fallback (HLS.js)
-        loadHLS(data.stream);
-      }
-    }
-  } catch (err) {
-    alert("Stream load failed");
+    const res = await fetch(`${MAIN_URL}/play.php?stream=${streamId}`, {
+      credentials: "include",
+      headers: { "Referer": MAIN_URL + "/" }
+    });
+    const text = await res.text();
+    const m = TOKEN_RE.exec(text);
+    return m ? `token=${m[1]}` : null;
+  } catch {
+    return null;
   }
 }
 
-// 🎥 HLS fallback
-function loadHLS(url) {
-  const script = document.createElement("script");
-  script.src = "https://cdn.jsdelivr.net/npm/hls.js@latest";
+// Quick test
+btnTest.addEventListener("click", async () => {
+  if (isRunning) return;
+  showLog('<span class="inf">⚡ T-Sports test করা হচ্ছে...</span>');
+  const token = await fetchToken("T-SPORTS");
+  if (token) {
+    showLog(`<span class="ok">✓ Token পাওয়া গেছে! BDIX connection OK.</span><br><span style="color:var(--muted);font-size:10px">${token.substring(0,60)}...</span>`);
+  } else {
+    showLog('<span class="err">✗ Token পাওয়া যায়নি। BDIX connection নেই বা সাইট down।</span>');
+  }
+});
 
-  script.onload = () => {
-    const video = document.getElementById("player");
-    const hls = new Hls();
-    hls.loadSource(url);
-    hls.attachMedia(video);
-  };
+// Main download
+btnDownload.addEventListener("click", async () => {
+  if (isRunning) return;
+  isRunning = true;
+  resetUI();
 
-  document.body.appendChild(script);
+  btnDownload.disabled = true;
+  btnDownload.classList.add("running");
+  btnText.textContent = "Fetching...";
+  progressWrap.classList.add("visible");
+  channelList.classList.add("visible");
+  channelsGrid.innerHTML = "";
+  showLog('<span class="inf">Token fetch শুরু হচ্ছে...</span>');
+
+  const targets = selectedCat === "ALL"
+    ? CHANNELS
+    : CHANNELS.filter(([,,, cat]) => cat === selectedCat);
+
+  const total = targets.length;
+  let done = 0, fetched = 0;
+  const lines = ["#EXTM3U"];
+
+  // Concurrency = 8 (same as extension)
+  const CONCURRENCY = 8;
+
+  for (let i = 0; i < targets.length; i += CONCURRENCY) {
+    const chunk = targets.slice(i, i + CONCURRENCY);
+    await Promise.all(chunk.map(async ([streamId, name, imgFile, category]) => {
+      const token = await fetchToken(streamId);
+      done++;
+      const pct = Math.round((done / total) * 100);
+      progressFill.style.width = pct + "%";
+      progressCount.textContent = `${done} / ${total}`;
+      statFetched.textContent = fetched;
+
+      const logoUrl = `${MAIN_URL}/assets/images/${imgFile}`;
+      const ok = !!token;
+      if (ok) {
+        fetched++;
+        statFetched.textContent = fetched;
+        const m3u8 = `${LIVE_SERVER}${streamId}/index.fmp4.m3u8?${token}`;
+        lines.push(`#EXTINF:-1 tvg-id="${streamId}" tvg-name="${name}" tvg-logo="${logoUrl}" group-title="${category}",${name}\n${m3u8}`);
+      }
+
+      // Add channel card
+      const card = document.createElement("div");
+      card.className = `ch-item ${ok ? "ok" : "fail"}`;
+      card.innerHTML = `
+        <img class="ch-logo" src="${logoUrl}" onerror="this.style.opacity=0.3" loading="lazy">
+        <div class="ch-info">
+          <div class="ch-name">${name}</div>
+          <div class="ch-cat">${category}</div>
+        </div>
+        <span class="ch-status">${ok ? "✓" : "✗"}</span>
+      `;
+      channelsGrid.appendChild(card);
+      // auto-scroll
+      channelsGrid.scrollTop = channelsGrid.scrollHeight;
+    }));
+  }
+
+  // Done
+  progressLabel.textContent = "সম্পন্ন!";
+  progressFill.style.width = "100%";
+  listCount.textContent = `${fetched} / ${total} সফল`;
+  showLog(`<span class="ok">✓ ${fetched}টি channel এর token পাওয়া গেছে।</span>`);
+  doneBanner.classList.add("visible");
+
+  // Download
+  if (fetched > 0) {
+    const blob = new Blob([lines.join("\n") + "\n"], { type: "audio/mpegurl" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `iptvidn_${Date.now()}.m3u`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } else {
+    showLog('<span class="err">✗ কোনো channel পাওয়া যায়নি। BDIX তে আছো?</span>');
+  }
+
+  isRunning = false;
+  btnDownload.disabled = false;
+  btnDownload.classList.remove("running");
+  btnText.textContent = "M3U Download";
+});
+
+function showLog(html) {
+  logEl.innerHTML = html;
+  logEl.classList.add("visible");
 }
-
-// 🚀 init
-loadChannels();
+function resetUI() {
+  doneBanner.classList.remove("visible");
+  progressWrap.classList.remove("visible");
+  progressFill.style.width = "0%";
+  statFetched.textContent = "—";
+  channelList.classList.remove("visible");
+  channelsGrid.innerHTML = "";
+  logEl.classList.remove("visible");
+}
 </script>
-
 </body>
 </html>
