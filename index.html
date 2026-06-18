@@ -1,19 +1,176 @@
 <!DOCTYPE html>
-<html>
-<head><title>Proxy Test</title></head>
-<body>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPTV Player</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<video id="v" controls width="640"></video>
-<script>
-const COOKIE = encodeURIComponent('Edge-Cache-Cookie=URLPrefix=aHR0cHM6Ly9ibGRjbXByb2QtY2RuLnRvZmZlZWxpdmUuY29t:Expires=1781981902:KeyName=prod_linear:Signature=8kJsd7pAknZsktUFtpNkirpWGWByQvBsXFAQgQDNvADoA8xlbtaQM1MOi24qaViv6V90HSHKarueOTFpmZgWCw');
-const URL = encodeURIComponent('https://bldcmprod-cdn.toffeelive.com/cdn/live/somoy_tv/playlist.m3u8');
-const src = `/api/proxy?url=${URL}&cookie=${COOKIE}`;
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0f0f0f; color: #fff; font-family: sans-serif; }
+#top { padding: 12px; background: #1a1a1a; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+#top input { flex: 1; min-width: 200px; padding: 8px; background: #2a2a2a; color: #fff; border: 1px solid #444; border-radius: 6px; font-size: 13px; }
+#top button { padding: 8px 14px; background: #e50914; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+#player-wrap { position: relative; background: #000; width: 100%; max-height: 50vw; }
+video { width: 100%; max-height: 50vw; display: block; }
+#channels { display: flex; flex-direction: column; overflow-y: auto; max-height: calc(100vh - 300px); }
+.group-title { padding: 8px 12px; background: #222; font-size: 12px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+.channel { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #1a1a1a; transition: background 0.2s; }
+.channel:hover, .channel.active { background: #e50914; }
+.channel img { width: 36px; height: 36px; object-fit: contain; border-radius: 4px; background: #222; }
+.channel span { font-size: 14px; }
+#status { padding: 8px 12px; font-size: 12px; color: #aaa; background: #111; }
+#proxy-bar { padding: 8px 12px; background: #1a1a1a; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+#proxy-bar input { flex: 1; min-width: 200px; padding: 6px; background: #2a2a2a; color: #fff; border: 1px solid #444; border-radius: 6px; font-size: 12px; }
+#proxy-bar label { font-size: 12px; color: #aaa; }
+</style>
+</head>
+<body>
 
-const hls = new Hls();
-hls.loadSource(src);
-hls.attachMedia(document.getElementById('v'));
-hls.on(Hls.Events.MANIFEST_PARSED, () => document.getElementById('v').play());
-hls.on(Hls.Events.ERROR, (e, d) => console.error(d));
+<div id="top">
+  <input id="m3u-url" placeholder="M3U URL দাও অথবা নিচে paste করো" />
+  <button onclick="loadFromUrl()">Load URL</button>
+  <button onclick="document.getElementById('m3u-file').click()">File</button>
+  <input type="file" id="m3u-file" accept=".m3u,.m3u8" style="display:none" onchange="loadFromFile(event)" />
+</div>
+
+<div id="proxy-bar">
+  <label>Proxy:</label>
+  <input id="proxy-url" placeholder="https://nameless-mouse-1795.marufhossainkeyas.workers.dev" value="" />
+  <button onclick="saveProxy()" style="padding:6px 10px;background:#333;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">Save</button>
+</div>
+
+<video id="video" controls></video>
+<div id="status">চ্যানেল select করুন</div>
+<div id="channels"></div>
+
+<script>
+let PROXY = localStorage.getItem('proxy') || '';
+let channels = [];
+let hls = null;
+
+document.getElementById('proxy-url').value = PROXY;
+
+function saveProxy() {
+  PROXY = document.getElementById('proxy-url').value.trim().replace(/\/$/, '');
+  localStorage.setItem('proxy', PROXY);
+  alert('Proxy saved!');
+}
+
+function proxyUrl(url, cookie, ua) {
+  if (!PROXY) return url;
+  let p = `${PROXY}/?url=${encodeURIComponent(url)}`;
+  if (cookie) p += `&cookie=${encodeURIComponent(cookie)}`;
+  if (ua) p += `&ua=${encodeURIComponent(ua)}`;
+  return p;
+}
+
+function parseM3U(text) {
+  const lines = text.split('\n');
+  const result = [];
+  let current = {};
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith('#EXTINF')) {
+      current = {};
+      const nameMatch = line.match(/,(.+)$/);
+      if (nameMatch) current.name = nameMatch[1].trim();
+      const groupMatch = line.match(/group-title="([^"]*)"/);
+      if (groupMatch) current.group = groupMatch[1];
+      const logoMatch = line.match(/tvg-logo="([^"]*)"/);
+      if (logoMatch) current.logo = logoMatch[1];
+    } else if (line.startsWith('#EXTHTTP')) {
+      try {
+        const json = line.replace('#EXTHTTP:', '').trim();
+        const parsed = JSON.parse(json);
+        if (parsed.cookie) current.cookie = parsed.cookie;
+      } catch(e) {}
+    } else if (line.startsWith('#EXTVLCOPT')) {
+      const uaMatch = line.match(/http-user-agent=(.+)/);
+      if (uaMatch) current.ua = uaMatch[1].trim();
+    } else if (line.startsWith('http') && current.name) {
+      current.url = line;
+      result.push({ ...current });
+      current = {};
+    }
+  }
+  return result;
+}
+
+function renderChannels(list) {
+  const container = document.getElementById('channels');
+  container.innerHTML = '';
+  const groups = {};
+  list.forEach(ch => {
+    const g = ch.group || 'Other';
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(ch);
+  });
+  Object.keys(groups).forEach(g => {
+    const gt = document.createElement('div');
+    gt.className = 'group-title';
+    gt.textContent = g;
+    container.appendChild(gt);
+    groups[g].forEach((ch, i) => {
+      const div = document.createElement('div');
+      div.className = 'channel';
+      div.innerHTML = `<img src="${ch.logo || ''}" onerror="this.style.display='none'" /><span>${ch.name}</span>`;
+      div.onclick = () => playChannel(ch, div);
+      container.appendChild(div);
+    });
+  });
+  document.getElementById('status').textContent = `${list.length}টি চ্যানেল লোড হয়েছে`;
+}
+
+function playChannel(ch, el) {
+  document.querySelectorAll('.channel').forEach(c => c.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.getElementById('status').textContent = `▶ ${ch.name} লোড হচ্ছে...`;
+
+  const src = proxyUrl(ch.url, ch.cookie, ch.ua);
+  const video = document.getElementById('video');
+
+  if (hls) { hls.destroy(); hls = null; }
+
+  if (Hls.isSupported()) {
+    hls = new Hls({ enableWorker: false });
+    hls.loadSource(src);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      video.play();
+      document.getElementById('status').textContent = `▶ ${ch.name}`;
+    });
+    hls.on(Hls.Events.ERROR, (e, d) => {
+      if (d.fatal) document.getElementById('status').textContent = `❌ Error: ${d.details}`;
+    });
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = src;
+    video.play();
+  }
+}
+
+function processM3U(text) {
+  channels = parseM3U(text);
+  renderChannels(channels);
+}
+
+function loadFromUrl() {
+  const url = document.getElementById('m3u-url').value.trim();
+  if (!url) return;
+  document.getElementById('status').textContent = 'লোড হচ্ছে...';
+  const src = PROXY ? `${PROXY}/?url=${encodeURIComponent(url)}` : url;
+  fetch(src).then(r => r.text()).then(processM3U).catch(e => {
+    document.getElementById('status').textContent = 'Error: ' + e.message;
+  });
+}
+
+function loadFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => processM3U(e.target.result);
+  reader.readAsText(file);
+}
 </script>
 </body>
 </html>
